@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rock Paper Scissors on Sepolia</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { margin-top: 10px; color: blue; }
+        #activeGamesList { margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Rock Paper Scissors</h1>
+    <button id="connectWallet" onclick="connectWallet()">Connect Wallet</button>
+    <div>
+        <h3>Create Game</h3>
+        <select id="createMove">
+            <option value="1">Rock</option>
+            <option value="2">Paper</option>
+            <option value="3">Scissors</option>
+        </select>
+        <input type="text" id="createSecret" placeholder="Enter secret" value="mysecret">
+        <button id="createGameBtn" onclick="createGame()" disabled>Create Game</button>
+    </div>
+    <div>
+        <h3>Join Game</h3>
+        <input type="number" id="joinGameId" placeholder="Game ID">
+        <select id="joinMove">
+            <option value="1">Rock</option>
+            <option value="2">Paper</option>
+            <option value="3">Scissors</option>
+        </select>
+        <input type="text" id="joinSecret" placeholder="Enter secret" value="mysecret2">
+        <button id="joinGameBtn" onclick="joinGame()" disabled>Join Game</button>
+    </div>
+    <div>
+        <h3>Reveal Move</h3>
+        <input type="number" id="revealGameId" placeholder="Game ID">
+        <select id="revealMove">
+            <option value="1">Rock</option>
+            <option value="2">Paper</option>
+            <option value="3">Scissors</option>
+        </select>
+        <input type="text" id="revealSecret" placeholder="Enter secret" value="mysecret">
+        <button id="revealMoveBtn" onclick="revealMove()" disabled>Reveal Move</button>
+    </div>
+    <div>
+        <h3>Active Games</h3>
+        <ul id="activeGamesList"></ul>
+    </div>
+    <div id="status" class="status"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+    <script>
+        const contractAddress = "0xc059a932745Ea4c74b60B1c233d123E31f092104"; // Обновите после деплоя
+        const abi = [
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "commit",
+				"type": "bytes32"
+			}
+		],
+		"name": "createGame",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "gameId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "player1",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "bet",
+				"type": "uint256"
+			}
+		],
+		"name": "GameCreated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "gameId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "winner",
+				"type": "address"
+			}
+		],
+		"name": "GameFinished",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "gameId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "commit",
+				"type": "bytes32"
+			}
+		],
+		"name": "joinGame",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "gameId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum RockPaperScissors.Move",
+				"name": "player1Move",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum RockPaperScissors.Move",
+				"name": "player2Move",
+				"type": "uint8"
+			}
+		],
+		"name": "MovesRevealed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "gameId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "player2",
+				"type": "address"
+			}
+		],
+		"name": "PlayerJoined",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "gameId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "enum RockPaperScissors.Move",
+				"name": "move",
+				"type": "uint8"
+			},
+			{
+				"internalType": "string",
+				"name": "secret",
+				"type": "string"
+			}
+		],
+		"name": "revealMove",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "gameIdCounter",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "games",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "player1",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "player2",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "player1Commit",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "player2Commit",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "enum RockPaperScissors.Move",
+				"name": "player1Move",
+				"type": "uint8"
+			},
+			{
+				"internalType": "enum RockPaperScissors.Move",
+				"name": "player2Move",
+				"type": "uint8"
+			},
+			{
+				"internalType": "enum RockPaperScissors.GameState",
+				"name": "state",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint256",
+				"name": "bet",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getActiveGames",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+];
+        let web3;
+        let contract;
+        let accounts;
+
+        async function connectWallet() {
+            if (window.ethereum) {
+                web3 = new Web3(window.ethereum);
+                try {
+                    accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    contract = new web3.eth.Contract(abi, contractAddress);
+                    updateStatus("Wallet connected: " + accounts[0]);
+                    document.getElementById("connectWallet").disabled = true;
+                    document.getElementById("createGameBtn").disabled = false;
+                    document.getElementById("joinGameBtn").disabled = false;
+                    document.getElementById("revealMoveBtn").disabled = false;
+                    updateActiveGames(); // Обновляем список игр
+                } catch (error) {
+                    console.error("Connection error:", error);
+                    updateStatus("Connection failed: " + error.message);
+                }
+            } else {
+                updateStatus("Please install MetaMask!");
+            }
+        }
+
+        async function createGame() {
+            const move = parseInt(document.getElementById("createMove").value);
+            const secret = document.getElementById("createSecret").value;
+            const commit = web3.utils.sha3(move.toString() + secret);
+            try {
+                const tx = await contract.methods.createGame(commit).send({
+                    from: accounts[0],
+                    value: web3.utils.toWei("0.01", "ether")
+                });
+                const gameId = tx.events.GameCreated.returnValues.gameId;
+                updateStatus(`Game created! Game ID: ${gameId}`);
+                updateActiveGames();
+            } catch (error) {
+                console.error("Create game error:", error);
+                updateStatus("Error creating game: " + error.message);
+            }
+        }
+
+        async function joinGame() {
+            const gameId = parseInt(document.getElementById("joinGameId").value);
+            const move = parseInt(document.getElementById("joinMove").value);
+            const secret = document.getElementById("joinSecret").value;
+            const commit = web3.utils.sha3(move.toString() + secret);
+            try {
+                await contract.methods.joinGame(gameId, commit).send({
+                    from: accounts[0],
+                    value: web3.utils.toWei("0.01", "ether")
+                });
+                updateStatus(`Joined game ${gameId}!`);
+                updateActiveGames();
+            } catch (error) {
+                console.error("Join game error:", error);
+                updateStatus("Error joining game: " + error.message);
+            }
+        }
+
+        async function revealMove() {
+            const gameId = parseInt(document.getElementById("revealGameId").value);
+            const move = parseInt(document.getElementById("revealMove").value);
+            const secret = document.getElementById("revealSecret").value;
+            try {
+                await contract.methods.revealMove(gameId, move, secret).send({
+                    from: accounts[0]
+                });
+                updateStatus(`Move revealed for game ${gameId}!`);
+                updateActiveGames();
+            } catch (error) {
+                console.error("Reveal move error:", error);
+                updateStatus("Error revealing move: " + error.message);
+            }
+        }
+
+        async function updateActiveGames() {
+            if (!contract) return;
+            try {
+                const activeGames = await contract.methods.getActiveGames().call();
+                const list = document.getElementById("activeGamesList");
+                list.innerHTML = "";
+                for (const gameId of activeGames) {
+                    const game = await contract.methods.games(gameId).call();
+                    const status = game.state == 0 ? "Waiting for player" : "Ready to reveal";
+                    const item = document.createElement("li");
+                    item.textContent = `Game ${gameId} - Bet: ${web3.utils.fromWei(game.bet, "ether")} ETH - Status: ${status}`;
+                    list.appendChild(item);
+                }
+            } catch (error) {
+                console.error("Error fetching active games:", error);
+            }
+        }
+
+        function updateStatus(message) {
+            document.getElementById("status").textContent = message;
+        }
+    </script>
+</body>
+</html>
