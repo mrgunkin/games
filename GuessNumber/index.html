@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Guess the Number on Sepolia</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { margin-top: 10px; color: blue; }
+    </style>
+</head>
+<body>
+    <h1>Guess the Number (1-10)</h1>
+    <button id="connectWallet" onclick="connectWallet()">Connect Wallet</button>
+    <div>
+        <h3>Play</h3>
+        <input type="number" id="guess" min="1" max="10" placeholder="Enter number (1-10)">
+        <button id="playBtn" onclick="playGame()" disabled>Play (0.01 ETH)</button>
+    </div>
+    <div id="status" class="status"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+    <script>
+        const contractAddress = "0x18d332003FCC8D2B723EC4b4C993b1485A05A84f"; // Замените на адрес контракта
+        const abi = [
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "player",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "guess",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "number",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "won",
+				"type": "bool"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "prize",
+				"type": "uint256"
+			}
+		],
+		"name": "GamePlayed",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "guess",
+				"type": "uint256"
+			}
+		],
+		"name": "play",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "withdraw",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"stateMutability": "payable",
+		"type": "receive"
+	},
+	{
+		"inputs": [],
+		"name": "MIN_BET",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalPrizePool",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+];
+        let web3;
+        let contract;
+        let accounts;
+
+        async function connectWallet() {
+            if (window.ethereum) {
+                web3 = new Web3(window.ethereum);
+                try {
+                    accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    contract = new web3.eth.Contract(abi, contractAddress);
+                    updateStatus("Wallet connected: " + accounts[0]);
+                    document.getElementById("connectWallet").disabled = true;
+                    document.getElementById("playBtn").disabled = false;
+                } catch (error) {
+                    updateStatus("Connection failed: " + error.message);
+                }
+            } else {
+                updateStatus("Please install MetaMask!");
+            }
+        }
+
+        async function playGame() {
+            const guess = parseInt(document.getElementById("guess").value);
+            if (isNaN(guess) || guess < 1 || guess > 10) {
+                updateStatus("Please enter a number between 1 and 10!");
+                return;
+            }
+
+            try {
+                const tx = await contract.methods.play(guess).send({
+                    from: accounts[0],
+                    value: web3.utils.toWei("0.01", "ether")
+                });
+                const won = tx.events.GamePlayed.returnValues.won;
+                const number = tx.events.GamePlayed.returnValues.number;
+                const prize = web3.utils.fromWei(tx.events.GamePlayed.returnValues.prize, "ether");
+                updateStatus(`You guessed ${guess}, number was ${number}. ${won ? `You won ${prize} ETH!` : "You lost!"}`);
+            } catch (error) {
+                console.error("Play error:", error);
+                updateStatus("Error playing game: " + error.message);
+            }
+        }
+
+        function updateStatus(message) {
+            document.getElementById("status").textContent = message;
+        }
+    </script>
+</body>
+</html>
